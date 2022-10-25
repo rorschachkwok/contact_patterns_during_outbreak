@@ -96,11 +96,6 @@ severity_by_rt_p <- severity_by_rt %>%
 
 
 load('data/contact_by_severity.RData')
-# scenario_df %>%
-#         group_by(scenario) %>%
-#         summarise(m = mean(mean),
-#                   lower = m - qnorm(0.975)*sd(mean)/sqrt(100),
-#                   upper = m + qnorm(0.975)*sd(mean)/sqrt(100))
 mean_contact_by_severity_p <- ggplot(data = scenario_df, mapping = aes(x = scenario, y = mean))+
         geom_jitter(
                 width = 0.2, color = 'grey', size = 0.5)+
