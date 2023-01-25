@@ -28,10 +28,10 @@ mean_contact_by_age_ls <- map(mean_contact_by_age_ls, ~.x %>% filter(days %in% c
 
 mean_contact_by_age_ls <- map(mean_contact_by_age_ls, ~.x %>% left_join(ox_index, by = 'days'))
 cor_ls <- map(mean_contact_by_age_ls, ~.x %>% 
-                           group_by(age_group) %>% 
-                           summarise(cor = cor(mean_contact, ox_index,
-                                               method = 'pearson',
-                                               use = 'complete.obs')))
+                      group_by(age_group) %>% 
+                      summarise(broom::tidy(cor.test(mean_contact, ox_index,
+                                                     method = 'pearson'))) %>% 
+                      select(age_group, estimate, p.value))
 with_cor_ls <- map2(mean_contact_by_age_ls, cor_ls, 
                     function(data, cor_text) {
                             data %>% left_join(cor_text, by = 'age_group')
@@ -44,10 +44,10 @@ mean_contact_overall_ls <- map(mean_contact_overall_ls, ~.x %>% filter(days %in%
 
 mean_contact_overall_ls <- map(mean_contact_overall_ls, ~.x %>% left_join(ox_index, by = 'days'))
 overall_cor_ls <- map(mean_contact_overall_ls, ~.x %>% 
-                      group_by(age_group) %>% 
-                      summarise(cor = cor(mean_contact, ox_index,
-                                          method = 'pearson',
-                                          use = 'complete.obs')))
+                              group_by(age_group) %>% 
+                              summarise(broom::tidy(cor.test(mean_contact, ox_index,
+                                                             method = 'pearson'))) %>% 
+                              select(age_group, estimate, p.value))
 overall_with_cor_ls <- map2(mean_contact_overall_ls, overall_cor_ls, 
                     function(data, cor_text) {
                             data %>% left_join(cor_text, by = 'age_group')
@@ -68,8 +68,9 @@ plot_scenarios_overall <- function(i){
                 annotate('text', x = 4.5, y = 0,
                          label = 'No policy change', size = 4, vjust = -1)+
                 geom_line(color = 'black', size = 0.5)+
-                geom_ribbon(aes(ymin = lower, ymax = upper, fill = cor), alpha = 0.6)+
-                geom_label(aes(label = format(round(cor, digits = 2), nsmall = 2)),
+                geom_ribbon(aes(ymin = lower, ymax = upper, fill = estimate), alpha = 0.6)+
+                geom_label(aes(label = paste0('r = ', format(round(estimate, digits = 2), nsmall = 2),'\np = ',
+                                              format(round(p.value, digits = 3), nsmall = 3))),
                            color = 'darkgrey',
                            fontface = "bold",
                            size = 4,
@@ -116,8 +117,9 @@ plot_all_scenario_by_age <- function(i){
                 mutate(scenario = scenario_names[[i]]) %>% 
                 ggplot(aes(x = days, y = mean_contact))+
                 geom_line(color = 'black', size = 0.5)+
-                geom_ribbon(aes(ymin = lower, ymax = upper, fill = cor), alpha = 0.6)+
-                geom_label(aes(label = format(round(cor, digits = 2), nsmall = 2)),
+                geom_ribbon(aes(ymin = lower, ymax = upper, fill = estimate), alpha = 0.6)+
+                geom_label(aes(label = paste0('r = ', format(round(estimate, digits = 2), nsmall = 2),'\np = ',
+                                              format(round(p.value, digits = 3), nsmall = 3))),
                            color = 'darkgrey',
                            fontface = "bold",
                            size = 4,
