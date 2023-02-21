@@ -6,17 +6,18 @@ pacman::p_load(
         paletteer,
         patchwork,
         ggpubr,
-        lubridate
+        lubridate,
+        cowplot
 )
 
-load('data/mean_contact_ls.Rdata')
+load('../data/mean_contact_ls.Rdata')
 
 # Ox index
 date_index <- data.frame(days = 0:6, 
                          date = seq.Date(from = as.Date('2022/03/13'),
                                          by = 'day',
                                          length.out = length(0:6)))
-ox_index <- read.xlsx('data/ox_index.xlsx', sheet = 1) %>% 
+ox_index <- read.xlsx('../data/ox_index.xlsx', sheet = 1) %>% 
         select('date' = Date, 'ox_index' = StringencyIndex) %>% 
         mutate(date = ymd(date)) %>% 
         filter(date %in% date_index[ ,'date']) %>% 
@@ -52,10 +53,10 @@ overall_with_cor_ls <- map2(mean_contact_overall_ls, overall_cor_ls,
                     function(data, cor_text) {
                             data %>% left_join(cor_text, by = 'age_group')
                     })
-# PLOT: 4 facets of 'all age groups'
+# PLOT: 4 facets of overall
 plot_scenarios_overall <- function(i){
         max_contact <- max(with_cor_ls[[i]]$upper) + 5
-        fig <- overall_with_cor_ls[[i]] %>% 
+        p1 <- overall_with_cor_ls[[i]] %>% 
                 ggplot(aes(x = days, y = mean_contact))+
                 scale_x_continuous(limits = c(0,6), 
                                    breaks = seq(0, 6, 1), 
@@ -67,23 +68,53 @@ plot_scenarios_overall <- function(i){
                          xmax = Inf, ymax = Inf, fill = "#E1DAEA") +
                 annotate('text', x = 4.5, y = 0,
                          label = 'No policy change', size = 4, vjust = -1)+
-                geom_line(color = 'black', size = 0.5)+
+                geom_line(color = 'black', linewidth = 0.5)+
                 geom_ribbon(aes(ymin = lower, ymax = upper, fill = estimate), alpha = 0.6)+
                 geom_label(aes(label = paste0('r = ', format(round(estimate, digits = 2), nsmall = 2),'\np = ',
                                               format(round(p.value, digits = 3), nsmall = 3))),
                            color = 'darkgrey',
                            fontface = "bold",
                            size = 4,
-                           x = Inf, y = Inf, 
-                           hjust   = 1,
+                           x = 0, y = Inf, 
+                           hjust   = 0,
                            vjust   = 1) +
                 scale_fill_gradient2(low = 'steelblue',
                                      high = 'red',
                                      mid = 'white',
                                      midpoint = 0,
                                      limit = c(-1, 1),
-                                     name = 'Pearson\nCorrelation')
-        return(fig)
+                                     name = 'Pearson\nCorrelation')+
+                theme_cowplot()+
+                theme(strip.background = element_blank(),
+                      panel.grid = element_blank(),
+                      axis.text = element_text(color = 'black'),
+                      plot.title = element_text(size = 10, hjust = 0.5),
+                      legend.position = 'none') +
+                labs(x = NULL,
+                     y = NULL,
+                     title = 'All Age Groups')
+        # Plot the time series of the stringency index
+        p2 <- ggplot(data = ox_index)+
+                geom_line(aes(x = days, y = ox_index), 
+                          color = '#57423F',
+                          linewidth = 0.8)+
+                scale_x_continuous(limits = c(0,6), 
+                                   breaks = seq(0, 6, 1), 
+                                   labels = NULL)+
+                scale_y_continuous(limits = c(59, 65), 
+                                   position = 'right')+
+                labs(x = NULL,
+                     y = 'Stringency Index')+
+                theme_cowplot()+
+                theme(legend.key = element_blank(),
+                      axis.ticks.x = element_blank(),
+                      strip.background = element_blank(),
+                      panel.grid = element_blank(),
+                      axis.text = element_text(color = 'black'))
+        aligned_plots <- align_plots(p1, p2, align="hv", axis="tblr")
+        aligned_plotted <- ggdraw(aligned_plots[[1]]) + draw_plot(aligned_plots[[2]])
+        
+        return(aligned_plotted)
 }
 scenarios_overall_plot <- map(1:4, plot_scenarios_overall)
 
@@ -91,16 +122,7 @@ mcnt_phased <- scenarios_overall_plot[[3]] +
         scenarios_overall_plot[[4]] +
         scenarios_overall_plot[[2]] +
         scenarios_overall_plot[[1]] +
-        plot_layout(nrow = 4)&
-        theme_classic2()+
-        theme(strip.background = element_blank(),
-              panel.grid = element_blank(),
-              axis.text = element_text(color = 'black'),
-              plot.title = element_text(size = 10, hjust = 0.5),
-              legend.position = 'none') &
-        labs(x = NULL,
-             y = NULL,
-             title = 'All Age Groups')
+        plot_layout(nrow = 4)
 
 # PLOT: 4 rows of different scenarios by age groups
 facet_label_ls <- list('Overall' = c('0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60+'),
@@ -116,7 +138,7 @@ plot_all_scenario_by_age <- function(i){
         fig <- with_cor_ls[[i]] %>% 
                 mutate(scenario = scenario_names[[i]]) %>% 
                 ggplot(aes(x = days, y = mean_contact))+
-                geom_line(color = 'black', size = 0.5)+
+                geom_line(color = 'black', linewidth = 0.5)+
                 geom_ribbon(aes(ymin = lower, ymax = upper, fill = estimate), alpha = 0.6)+
                 geom_label(aes(label = paste0('r = ', format(round(estimate, digits = 2), nsmall = 2),'\np = ',
                                               format(round(p.value, digits = 3), nsmall = 3))),
@@ -139,9 +161,9 @@ plot_all_scenario_by_age <- function(i){
                                    labels = seq(1, 7, 1))+
                 scale_y_continuous(expand = expansion(mult = c(0, 0.1)),
                                    breaks = pretty(c(0, max_contact)),
-                                   limits = range(pretty(c(0, max_contact)))) +
-                labs(x = NULL, 
-                     y = NULL)
+                                   limits = range(pretty(c(0, max_contact))))+
+                labs(x = NULL,
+                     y = NULL) 
         return(fig)
 }
 all_scenario_by_age_plot <- map(1:4, plot_all_scenario_by_age)
@@ -153,24 +175,20 @@ mcnt_by_age <- all_scenario_by_age_plot[[3]] + # school
         plot_layout(nrow = 4, guides = 'collect')&
         theme_classic2()+
         theme(strip.background = element_blank(),
-              axis.ticks.y = element_blank(),
-              axis.text.y = element_blank(),
               axis.title = element_text(size = 12),
-              axis.text = element_text(size = 12, color = 'black'))&
-        labs(x = NULL,
-             y = NULL)
+              axis.text = element_text(size = 12, color = 'black'))
 
 
-
-
-source('add_global_label.R')
-add_global_label(((mcnt_phased | mcnt_by_age) + 
-                          plot_layout(ncol = 2, widths = c(1,2))+
-                          plot_annotation(caption = 'Days since outbreak',
-                                          theme = theme(plot.caption = element_text(hjust = 0.5, 
-                                                                                    size = 12)))),
-                 Ylab = "Mean Contacts",
-                 Ygap = 0.02)
+# source('add_global_label.R')
+# add_global_label(((mcnt_phased | mcnt_by_age) + 
+#                           plot_layout(ncol = 2, widths = c(1,2))+
+#                           plot_annotation(caption = 'Days since outbreak',
+#                                           theme = theme(plot.caption = element_text(hjust = 0.5, 
+#                                                                                     size = 12)))),
+#                  Ylab = "Mean Contacts",
+#                  Ygap = 0.02)
+plot_grid(mcnt_phased, mcnt_by_age, align = "v", axis = "trbl", 
+          rel_widths = c(1, 2))
 
 ggsave('fig1.pdf', family = 'Times New Roman', 
        height = 10, width = 15,
